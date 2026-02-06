@@ -4,8 +4,24 @@ declare(strict_types=1);
 
 namespace GildedRose;
 
+use GildedRose\ItemUpdater\AgedBrieUpdater;
+use GildedRose\ItemUpdater\BackstagePassUpdater;
+use GildedRose\ItemUpdater\ConjuredItemUpdater;
+use GildedRose\ItemUpdater\ItemUpdaterInterface;
+use GildedRose\ItemUpdater\NormalItemUpdater;
+use GildedRose\ItemUpdater\SulfurasUpdater;
+
 final class GildedRose
 {
+    /**
+     * @var array<string, class-string<ItemUpdaterInterface>>
+     */
+    private const ITEM_UPDATERS = [
+        'Aged Brie' => AgedBrieUpdater::class,
+        'Backstage passes to a TAFKAL80ETC concert' => BackstagePassUpdater::class,
+        'Sulfuras, Hand of Ragnaros' => SulfurasUpdater::class,
+    ];
+
     /**
      * @param Item[] $items
      */
@@ -17,51 +33,23 @@ final class GildedRose
     public function updateQuality(): void
     {
         foreach ($this->items as $item) {
-            if ($item->name != 'Aged Brie' and $item->name != 'Backstage passes to a TAFKAL80ETC concert') {
-                if ($item->quality > 0) {
-                    if ($item->name != 'Sulfuras, Hand of Ragnaros') {
-                        $item->quality = $item->quality - 1;
-                    }
-                }
-            } else {
-                if ($item->quality < 50) {
-                    $item->quality = $item->quality + 1;
-                    if ($item->name == 'Backstage passes to a TAFKAL80ETC concert') {
-                        if ($item->sellIn < 11) {
-                            if ($item->quality < 50) {
-                                $item->quality = $item->quality + 1;
-                            }
-                        }
-                        if ($item->sellIn < 6) {
-                            if ($item->quality < 50) {
-                                $item->quality = $item->quality + 1;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if ($item->name != 'Sulfuras, Hand of Ragnaros') {
-                $item->sellIn = $item->sellIn - 1;
-            }
-
-            if ($item->sellIn < 0) {
-                if ($item->name != 'Aged Brie') {
-                    if ($item->name != 'Backstage passes to a TAFKAL80ETC concert') {
-                        if ($item->quality > 0) {
-                            if ($item->name != 'Sulfuras, Hand of Ragnaros') {
-                                $item->quality = $item->quality - 1;
-                            }
-                        }
-                    } else {
-                        $item->quality = $item->quality - $item->quality;
-                    }
-                } else {
-                    if ($item->quality < 50) {
-                        $item->quality = $item->quality + 1;
-                    }
-                }
-            }
+            $updater = $this->resolveUpdater($item);
+            $updater->update($item);
         }
+    }
+
+    private function resolveUpdater(Item $item): ItemUpdaterInterface
+    {
+        if (str_starts_with($item->name, 'Conjured')) {
+            return new ConjuredItemUpdater();
+        }
+
+        $updaterClass = self::ITEM_UPDATERS[$item->name] ?? null;
+
+        if ($updaterClass !== null) {
+            return new $updaterClass();
+        }
+
+        return new NormalItemUpdater();
     }
 }
